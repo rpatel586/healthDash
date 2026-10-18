@@ -2,295 +2,760 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fitness Activity Dashboard</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Chart.js CDN -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- PapaParse for CSV parsing -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f6fa">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Fitness">
+  <title>Fitness</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg: #f4f6fa;
+      --panel: #ffffff;
+      --panel-2: #eef1f6;
+      --line: #e3e7ef;
+      --text: #141a26;
+      --muted: #667085;
+      --faint: #a3abbb;
+      --grid: #edf0f5;
+      --steps: #2f80ed;
+      --kcal: #f2711c;
+      --dist: #12a87a;
+      --vo2: #8b5cf6;
+      --deep: #4338ca;
+      --core: #3b9bf0;
+      --rem: #a78bfa;
+      --awake: #f0a35e;
+      --good: #16a34a;
+      --ok: #d99a06;
+      --bad: #e5484d;
+      --shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 4px 16px rgba(16, 24, 40, .05);
+      --radius: 20px;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; background: var(--bg); color: var(--text); }
+    body {
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-variant-numeric: tabular-nums;
+      min-height: 100vh;
+      padding: max(16px, env(safe-area-inset-top)) 16px calc(32px + env(safe-area-inset-bottom));
+    }
+    .wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+    /* Header */
+    .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .greet { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+    .sub { color: var(--muted); font-size: 14px; margin-top: 4px; display: flex; align-items: center; gap: 8px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); display: inline-block; }
+    .dot.live { background: var(--good); box-shadow: 0 0 0 4px rgba(22, 163, 74, .14); }
+    .dot.err { background: var(--bad); }
+    .icon-btn {
+      background: var(--panel); border: 1px solid var(--line); color: var(--text);
+      width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; cursor: pointer; flex: none;
+    }
+    .icon-btn svg { width: 20px; height: 20px; }
+    .icon-btn.spin svg { animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Controls */
+    .controls { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+    .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 4px; }
+    .seg button {
+      border: 0; background: none; color: var(--muted); font: inherit; font-weight: 600; font-size: 14px;
+      padding: 9px 18px; border-radius: 10px; cursor: pointer;
+    }
+    .seg button.on { background: var(--text); color: #fff; }
+    .daynav { display: inline-flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 4px; }
+    .daynav button { border: 0; background: none; color: var(--text); width: 34px; height: 34px; border-radius: 10px; cursor: pointer; font-size: 18px; }
+    .daynav button:disabled { color: var(--faint); cursor: default; }
+    .daynav .lbl { font-weight: 600; font-size: 14px; min-width: 128px; text-align: center; }
+
+    /* Cards */
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+    .card h2 { margin: 0; font-size: 15px; font-weight: 600; }
+    .card .hint { color: var(--muted); font-size: 13px; margin: 4px 0 0; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); }
+    .span-all { grid-column: 1 / -1; }
+    .chart-box { position: relative; height: 230px; margin-top: 14px; }
+    .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 36px 8px; }
+    [hidden] { display: none !important; }
+
+    /* Sleep hero */
+    .hero { display: grid; grid-template-columns: auto 1fr; gap: 24px; align-items: center; }
+    @media (max-width: 560px) { .hero { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
+    .ring-wrap { position: relative; width: 190px; height: 190px; }
+    .ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .ring-center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; }
+    .ring-num { font-size: 54px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+    .ring-cap { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-top: 6px; }
+    .grade { display: inline-block; font-size: 13px; font-weight: 700; padding: 5px 12px; border-radius: 999px; margin-bottom: 10px; }
+    .big { font-size: 40px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.05; }
+    .big small { font-size: 16px; color: var(--muted); font-weight: 600; margin-left: 6px; }
+    .insight { color: var(--muted); font-size: 15px; line-height: 1.5; margin: 10px 0 0; max-width: 52ch; }
+
+    .stagebar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--panel-2); margin-top: 18px; }
+    .stagebar span { display: block; height: 100%; }
+    .stages { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px; }
+    @media (max-width: 420px) { .stages { grid-template-columns: 1fr; } }
+    .stage { background: var(--panel-2); border-radius: 14px; padding: 14px; }
+    .stage .k { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; font-weight: 600; }
+    .stage .k i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+    .stage .v { font-size: 22px; font-weight: 700; margin-top: 6px; }
+    .stage .p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+    .breakdown { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+    .brow .top-line { display: flex; justify-content: space-between; font-size: 14px; }
+    .brow .top-line b { font-weight: 600; }
+    .brow .top-line span { color: var(--muted); }
+    .brow .why { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .bar { height: 8px; border-radius: 999px; background: var(--panel-2); margin-top: 7px; overflow: hidden; }
+    .bar > span { display: block; height: 100%; border-radius: 999px; transition: width .6s ease; }
+
+    /* Activity */
+    .rings { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    @media (max-width: 420px) { .rings { gap: 10px; } }
+    .ring-card { display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .ring-card .ring-wrap { width: 150px; height: 150px; }
+    @media (max-width: 420px) { .ring-card .ring-wrap { width: 128px; height: 128px; } }
+    .ring-card .ring-num { font-size: 30px; }
+    .ring-card .label { font-weight: 600; margin-top: 12px; }
+    .ring-card .togo { font-size: 13px; color: var(--muted); margin-top: 3px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
+    .stat .k { color: var(--muted); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+    .stat .v { font-size: 26px; font-weight: 700; margin-top: 6px; }
+    .stat .v small { font-size: 14px; color: var(--muted); font-weight: 600; margin-left: 4px; }
+    .stat .d { font-size: 12px; color: var(--muted); margin-top: 3px; }
+    .up { color: var(--good) !important; } .down { color: var(--bad) !important; }
+
+    .tabs-mini { display: inline-flex; gap: 4px; background: var(--panel-2); border-radius: 10px; padding: 3px; }
+    .tabs-mini button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 8px; cursor: pointer; }
+    .tabs-mini button.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(16,24,40,.08); }
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+
+    /* Settings */
+    dialog { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 20px; padding: 0; width: min(440px, calc(100vw - 32px)); }
+    dialog::backdrop { background: rgba(16,24,40,.35); }
+    .dlg { padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+    .dlg h3 { margin: 0; font-size: 18px; }
+    .dlg label { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+    .dlg input { background: var(--panel-2); border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 14px; }
+    .dlg .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .dlg .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+    .btn { border: 0; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 600; cursor: pointer; }
+    .btn.pri { background: var(--steps); color: #fff; }
+    .btn.sec { background: var(--panel-2); color: var(--text); }
+    .note { font-size: 12px; color: var(--faint); line-height: 1.5; }
+    .foot { text-align: center; color: var(--faint); font-size: 12px; margin-top: 8px; }
+  </style>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen p-6">
-  <div class="max-w-7xl mx-auto space-y-6">
-    
-    <!-- Header Section -->
-    <header class="flex flex-col md:flex-row justify-between items-center bg-gray-800 p-6 rounded-xl shadow-md border border-gray-700">
+<body>
+  <div class="wrap">
+
+    <header class="top">
       <div>
-        <h1 class="text-3xl font-bold text-white">Fitness Activity Dashboard</h1>
-        <p class="text-sm text-gray-400 mt-1">Live metrics parsed directly from your Google Sheet tracker</p>
+        <h1 class="greet" id="greet">Hello</h1>
+        <div class="sub"><span class="dot" id="statusDot"></span><span id="statusText">Loading your data…</span></div>
       </div>
-      <div class="mt-4 md:mt-0 flex items-center space-x-3 w-full md:w-auto">
-        <input 
-          type="text" 
-          id="sheetUrl" 
-          value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQR_NpghLCqPc7iZaUVGCGfiMBn-BdJDAcvuLtAAxpZiV1-yq1IqCw5IhjUvwg4oMNU9UFCFWkhjE6t/pub?output=csv"
-          placeholder="Published Google Sheet CSV URL" 
-          class="bg-gray-700 text-white px-4 py-2 rounded-lg border border-gray-600 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-80"
-        />
-        <button 
-          onclick="loadDashboardData()" 
-          class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors shadow">
-          Refresh
+      <div style="display:flex; gap:8px;">
+        <button class="icon-btn" id="refreshBtn" aria-label="Refresh">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+        </button>
+        <button class="icon-btn" id="settingsBtn" aria-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </div>
     </header>
 
-    <!-- Date Selection Controls -->
-    <div class="flex items-center justify-between bg-gray-800 px-6 py-4 rounded-xl border border-gray-700">
-      <div class="flex items-center space-x-2">
-        <label for="dateSelect" class="text-sm font-medium text-gray-300">Select Viewing Date:</label>
-        <select id="dateSelect" onchange="updateDashboardView()" class="bg-gray-700 text-white px-3 py-1.5 rounded-md border border-gray-600 text-sm focus:outline-none">
-          <option value="">Loading dates...</option>
-        </select>
+    <div class="controls">
+      <div class="seg" role="tablist">
+        <button id="tabSleep" data-view="sleep">😴 Sleep</button>
+        <button id="tabActivity" data-view="activity">🔥 Activity</button>
       </div>
-      <div id="lastUpdated" class="text-xs text-gray-400">Status: Initializing auto-load...</div>
-    </div>
-
-    <!-- Summary Stat Cards -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
-        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Total Steps</span>
-        <div id="metricSteps" class="text-3xl font-extrabold text-blue-400 mt-2">--</div>
-      </div>
-      <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
-        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Distance</span>
-        <div id="metricDistance" class="text-3xl font-extrabold text-emerald-400 mt-2">--</div>
-      </div>
-      <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
-        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Active Calories</span>
-        <div id="metricCalories" class="text-3xl font-extrabold text-amber-400 mt-2">--</div>
-      </div>
-      <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
-        <span class="text-xs font-semibold text-gray-400 uppercase tracking-wider">VO2 Max</span>
-        <div id="metricVo2" class="text-3xl font-extrabold text-purple-400 mt-2">--</div>
+      <div class="daynav">
+        <button id="prevDay" aria-label="Previous day">‹</button>
+        <span class="lbl" id="dayLabel">—</span>
+        <button id="nextDay" aria-label="Next day">›</button>
       </div>
     </div>
 
-    <!-- Analytics Charts Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
-        <h2 class="text-base font-semibold text-gray-200 mb-4">Steps Progression Over Time</h2>
-        <div class="relative h-64">
-          <canvas id="stepsChart"></canvas>
+    <!-- ================= SLEEP ================= -->
+    <section id="viewSleep" hidden>
+      <div class="card" id="sleepHero">
+        <div class="hero" id="sleepHeroBody">
+          <div class="ring-wrap">
+            <svg viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="52" fill="none" stroke="var(--panel-2)" stroke-width="12"/>
+              <circle id="scoreArc" cx="60" cy="60" r="52" fill="none" stroke="var(--good)" stroke-width="12" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" style="transition: stroke-dashoffset .9s ease, stroke .3s"/>
+            </svg>
+            <div class="ring-center"><div><div class="ring-num" id="scoreNum">–</div><div class="ring-cap">Sleep score</div></div></div>
+          </div>
+          <div>
+            <span class="grade" id="grade">—</span>
+            <div class="big" id="sleepTotal">–</div>
+            <div class="sub" id="sleepNight" style="margin-top:6px;"></div>
+            <p class="insight" id="sleepInsight"></p>
+          </div>
+        </div>
+        <div class="empty" id="sleepEmpty" hidden></div>
+        <div id="stageSection">
+          <div class="stagebar" id="stageBar"></div>
+          <div class="stages">
+            <div class="stage"><div class="k"><i style="background:var(--deep)"></i>Deep</div><div class="v" id="stDeep">–</div><div class="p" id="stDeepP"></div></div>
+            <div class="stage"><div class="k"><i style="background:var(--core)"></i>Core</div><div class="v" id="stCore">–</div><div class="p" id="stCoreP"></div></div>
+            <div class="stage"><div class="k"><i style="background:var(--rem)"></i>REM</div><div class="v" id="stRem">–</div><div class="p" id="stRemP"></div></div>
+          </div>
         </div>
       </div>
-      <div class="bg-gray-800 p-5 rounded-xl border border-gray-700 shadow-sm">
-        <h2 class="text-base font-semibold text-gray-200 mb-4">Active Calories Burned</h2>
-        <div class="relative h-64">
-          <canvas id="caloriesChart"></canvas>
+
+      <div class="grid" style="margin-top:16px;">
+        <div class="card" id="breakdownCard">
+          <h2>How your score was worked out</h2>
+          <p class="hint">Out of 100, from four parts of the night.</p>
+          <div class="breakdown" id="breakdown"></div>
+        </div>
+        <div class="card">
+          <h2>Last 14 nights</h2>
+          <p class="hint">Hours asleep by stage, with your score as the line.</p>
+          <div class="chart-box"><canvas id="sleepTrend"></canvas></div>
         </div>
       </div>
-    </div>
+    </section>
 
+    <!-- ================= ACTIVITY ================= -->
+    <section id="viewActivity" hidden>
+      <div class="card">
+        <div class="rings">
+          <div class="ring-card">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="var(--panel-2)" stroke-width="12"/>
+                <circle id="stepsArc" cx="60" cy="60" r="52" fill="none" stroke="var(--steps)" stroke-width="12" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" style="transition: stroke-dashoffset .9s ease"/>
+              </svg>
+              <div class="ring-center"><div><div class="ring-num" id="stepsNum">–</div><div class="ring-cap" id="stepsPct">steps</div></div></div>
+            </div>
+            <div class="label">Steps</div>
+            <div class="togo" id="stepsToGo"></div>
+          </div>
+          <div class="ring-card">
+            <div class="ring-wrap">
+              <svg viewBox="0 0 120 120">
+                <circle cx="60" cy="60" r="52" fill="none" stroke="var(--panel-2)" stroke-width="12"/>
+                <circle id="kcalArc" cx="60" cy="60" r="52" fill="none" stroke="var(--kcal)" stroke-width="12" stroke-linecap="round" stroke-dasharray="326.7" stroke-dashoffset="326.7" style="transition: stroke-dashoffset .9s ease"/>
+              </svg>
+              <div class="ring-center"><div><div class="ring-num" id="kcalNum">–</div><div class="ring-cap" id="kcalPct">kcal</div></div></div>
+            </div>
+            <div class="label">Active calories</div>
+            <div class="togo" id="kcalToGo"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats" style="margin-top:16px;">
+        <div class="stat"><div class="k">Distance</div><div class="v"><span id="distVal">–</span><small>km</small></div><div class="d" id="distD"></div></div>
+        <div class="stat"><div class="k">VO2 max</div><div class="v" id="vo2Val">–</div><div class="d" id="vo2D"></div></div>
+        <div class="stat"><div class="k">Last night</div><div class="v" id="miniSleep">–</div><div class="d" id="miniSleepD"></div></div>
+        <div class="stat"><div class="k">Last sync</div><div class="v" id="syncVal">–</div><div class="d" id="syncD"></div></div>
+      </div>
+
+      <div class="grid" style="margin-top:16px;">
+        <div class="card span-all">
+          <div class="card-head">
+            <div>
+              <h2 id="hourTitle">Through the day</h2>
+              <p class="hint" id="hourHint">Bars show each hour, the line the running total.</p>
+            </div>
+            <div class="tabs-mini">
+              <button class="on" data-metric="steps">Steps</button>
+              <button data-metric="kcal">Calories</button>
+            </div>
+          </div>
+          <div class="chart-box"><canvas id="hourChart"></canvas></div>
+          <div class="empty" id="hourEmpty" hidden>No syncs from your iPhone for this day yet.</div>
+        </div>
+        <div class="card">
+          <h2>Steps · last 7 days</h2>
+          <p class="hint">Dashed line is your goal.</p>
+          <div class="chart-box"><canvas id="weekSteps"></canvas></div>
+        </div>
+        <div class="card">
+          <h2>Active calories · last 7 days</h2>
+          <p class="hint">Dashed line is your goal.</p>
+          <div class="chart-box"><canvas id="weekKcal"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="foot">Data from your iPhone via Google Sheets · refreshes every 5 minutes</div>
   </div>
 
-  <script>
-    let rawParsedData = [];
-    let groupedByDate = {};
-    let stepsChartInstance = null;
-    let caloriesChartInstance = null;
+  <dialog id="settings">
+    <form class="dlg" method="dialog">
+      <h3>Settings</h3>
+      <label>Published sheet CSV link
+        <input id="setUrl" type="url" placeholder="https://docs.google.com/…/pub?output=csv">
+      </label>
+      <div class="row">
+        <label>Step goal<input id="setSteps" type="number" min="1000" step="500"></label>
+        <label>Active kcal goal<input id="setKcal" type="number" min="100" step="50"></label>
+        <label>Sleep target (h)<input id="setSleep" type="number" min="5" max="11" step="0.25"></label>
+      </div>
+      <p class="note">Settings are saved on this device only. Google can take up to 5 minutes to publish new rows to the CSV link.</p>
+      <div class="actions">
+        <button class="btn sec" value="cancel">Cancel</button>
+        <button class="btn pri" value="save" id="saveSettings">Save</button>
+      </div>
+    </form>
+  </dialog>
 
-    // Automatically load data as soon as the DOM fully loads
-    window.addEventListener('DOMContentLoaded', () => {
-      loadDashboardData();
+  <script>
+  (() => {
+    // ---------------- settings ----------------
+    const DEFAULTS = {
+      url: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQR_NpghLCqPc7iZaUVGCGfiMBn-BdJDAcvuLtAAxpZiV1-yq1IqCw5IhjUvwg4oMNU9UFCFWkhjE6t/pub?output=csv',
+      stepGoal: 10000,
+      kcalGoal: 800,
+      sleepTarget: 8,
+    };
+    const loadSettings = () => {
+      try { return Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('fitnessSettings') || '{}')); }
+      catch (e) { return Object.assign({}, DEFAULTS); }
+    };
+    let S = loadSettings();
+    const saveSettings = () => { try { localStorage.setItem('fitnessSettings', JSON.stringify(S)); } catch (e) {} };
+
+    // ---------------- helpers ----------------
+    const $ = (id) => document.getElementById(id);
+    const MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+    const pad = (n) => String(n).padStart(2, '0');
+    const keyOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const fromKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+    const addDays = (k, n) => { const d = fromKey(k); d.setDate(d.getDate() + n); return keyOf(d); };
+    const num = (x) => { const n = parseFloat(String(x ?? '').trim()); return Number.isFinite(n) ? n : null; };
+    const fmt = (n) => (n == null ? '–' : Math.round(n).toLocaleString('en-GB'));
+    const hm = (m) => { if (m == null) return '–'; m = Math.round(m); const h = Math.floor(m / 60); return h ? `${h}h ${pad(m % 60)}m` : `${m}m`; };
+    const clamp01 = (x) => Math.max(0, Math.min(1, x));
+    const dayName = (k, opts) => fromKey(k).toLocaleDateString('en-GB', opts);
+    const todayKey = () => keyOf(new Date());
+
+    // "18 Oct 2026 at 07:00" -> Date in local time (Safari can't parse this format itself)
+    function parseStamp(s) {
+      const m = /^\s*(\d{1,2})\s+([A-Za-z]{3})[a-z]*\s+(\d{4})\s+at\s+(\d{1,2}):(\d{2})/.exec(String(s || ''));
+      if (m && MONTHS[m[2].toLowerCase()] != null) return new Date(+m[3], MONTHS[m[2].toLowerCase()], +m[1], +m[4], +m[5]);
+      const d = new Date(String(s || '').replace(' at ', ' '));
+      return isNaN(d) ? null : d;
+    }
+
+    // ---------------- state ----------------
+    let rows = [];            // every sync, oldest first
+    let days = new Map();     // dayKey -> summary
+    let dayKeys = [];         // sorted
+    let selected = todayKey();
+    let view = new Date().getHours() < 12 ? 'sleep' : 'activity';
+    let hourMetric = 'steps';
+    const charts = {};
+
+    // ---------------- data ----------------
+    function load() {
+      const btn = $('refreshBtn');
+      btn.classList.add('spin');
+      setStatus('', 'Updating…');
+      const url = S.url + (S.url.includes('?') ? '&' : '?') + 't=' + Date.now();
+      Papa.parse(url, {
+        download: true, header: false, skipEmptyLines: true,
+        complete: (res) => {
+          btn.classList.remove('spin');
+          ingest(res.data);
+          const last = rows[rows.length - 1];
+          setStatus('live', last ? `Last iPhone sync ${relTime(last.ts)}` : 'Connected · no rows yet');
+          render();
+        },
+        error: () => {
+          btn.classList.remove('spin');
+          setStatus('err', 'Couldn’t reach your sheet. Check it’s published to the web.');
+        },
+      });
+    }
+
+    function ingest(data) {
+      rows = [];
+      for (const r of data) {
+        const ts = parseStamp(r[0]);
+        if (!ts) continue; // skips the header row and blanks
+        rows.push({
+          ts, day: keyOf(ts),
+          steps: num(r[1]), dist: num(r[2]), vo2: num(r[3]), kcal: num(r[4]),
+          sleep: num(r[5]), core: num(r[6]), deep: num(r[7]), rem: num(r[8]),
+        });
+      }
+      rows.sort((a, b) => a.ts - b.ts);
+
+      days = new Map();
+      for (const r of rows) {
+        const d = days.get(r.day) || { day: r.day, rows: [], steps: null, dist: null, kcal: null, vo2: null, sleep: null, core: null, deep: null, rem: null, last: null };
+        d.rows.push(r);
+        // Steps, distance and calories count up through the day, so the day's figure is the highest one.
+        for (const k of ['steps', 'dist', 'kcal']) if (r[k] != null) d[k] = Math.max(d[k] ?? 0, r[k]);
+        if (r.vo2 != null) d.vo2 = r.vo2;
+        // Sleep is last night's total, sent with every sync; take the fullest reading of the day.
+        if (r.sleep != null && r.sleep > 0 && r.sleep >= (d.sleep ?? 0)) {
+          d.sleep = r.sleep; d.core = r.core; d.deep = r.deep; d.rem = r.rem;
+        }
+        d.last = r.ts;
+        days.set(r.day, d);
+      }
+      dayKeys = [...days.keys()].sort();
+      if (!days.has(selected) && selected !== todayKey()) selected = dayKeys[dayKeys.length - 1] || todayKey();
+    }
+
+    function relTime(d) {
+      const mins = Math.round((Date.now() - d) / 60000);
+      const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      if (keyOf(d) !== todayKey()) return `${dayName(keyOf(d), { weekday: 'short', day: 'numeric', month: 'short' })} at ${time}`;
+      if (mins < 1) return 'just now';
+      if (mins < 60) return `${mins} min ago (${time})`;
+      return `at ${time}`;
+    }
+
+    function setStatus(kind, text) {
+      $('statusDot').className = 'dot' + (kind ? ' ' + kind : '');
+      $('statusText').textContent = text;
+    }
+
+    // ---------------- sleep score ----------------
+    // Duration 50 · Deep 20 · REM 20 · Consistency 10. Stage parts are skipped (and the rest scaled up)
+    // when the night has no stage data.
+    function sleepScore(dayKey) {
+      const d = days.get(dayKey);
+      if (!d || !d.sleep) return null;
+      const mins = d.sleep;
+      const target = S.sleepTarget * 60;
+      const deep = d.deep || 0, rem = d.rem || 0, core = d.core || 0;
+      const hasStages = deep + rem + core > 0;
+
+      // Duration: full marks from 30 min under target to 90 min over; nothing below 4 hours.
+      let dur;
+      if (mins < target - 30) dur = clamp01((mins - 240) / (target - 30 - 240));
+      else if (mins > target + 90) dur = Math.max(0.7, 1 - (mins - target - 90) / 600);
+      else dur = 1;
+
+      const deepPct = hasStages ? deep / mins : null;
+      const remPct = hasStages ? rem / mins : null;
+      const deepS = hasStages ? clamp01((deepPct - 0.05) / (0.15 - 0.05)) : null; // 15%+ of the night is ideal
+      const remS = hasStages ? clamp01((remPct - 0.08) / (0.20 - 0.08)) : null;   // 20%+ of the night is ideal
+
+      // Consistency: how close this night is to your average of the 7 nights before.
+      const prev = [];
+      for (let i = 1; i <= 7; i++) { const p = days.get(addDays(dayKey, -i)); if (p && p.sleep) prev.push(p.sleep); }
+      const avg = prev.length ? prev.reduce((a, b) => a + b, 0) / prev.length : null;
+      const consS = avg == null ? null : clamp01(1 - (Math.abs(mins - avg) - 30) / 90);
+
+      const parts = [
+        { key: 'dur', name: 'Duration', max: 50, s: dur, why: `${hm(mins)} asleep vs your ${S.sleepTarget}h target` },
+        { key: 'deep', name: 'Deep sleep', max: 20, s: deepS, why: hasStages ? `${Math.round(deepPct * 100)}% of the night · 15%+ is ideal` : 'No stage data for this night' },
+        { key: 'rem', name: 'REM sleep', max: 20, s: remS, why: hasStages ? `${Math.round(remPct * 100)}% of the night · 20%+ is ideal` : 'No stage data for this night' },
+        { key: 'cons', name: 'Consistency', max: 10, s: consS, why: avg == null ? 'Builds up once you have a few nights of data' : `${hm(Math.abs(mins - avg))} ${mins >= avg ? 'more' : 'less'} than your 7-night average of ${hm(avg)}` },
+      ];
+      const counted = parts.filter((p) => p.s != null);
+      const maxCounted = counted.reduce((a, p) => a + p.max, 0);
+      const raw = counted.reduce((a, p) => a + p.s * p.max, 0);
+      const score = Math.round((raw / maxCounted) * 100);
+      return { score, parts, mins, deep, rem, core, hasStages, avg, deepPct, remPct };
+    }
+
+    const gradeOf = (s) => s >= 85 ? ['Excellent', 'var(--good)'] : s >= 70 ? ['Good', '#22a06b'] : s >= 55 ? ['Fair', 'var(--ok)'] : ['Poor', 'var(--bad)'];
+
+    function insightFor(sc) {
+      const target = S.sleepTarget * 60;
+      const bits = [];
+      const diff = sc.mins - target;
+      if (diff <= -60) bits.push(`A short night: ${hm(-diff)} under your ${S.sleepTarget}h target.`);
+      else if (diff < -15) bits.push(`Slightly short of your ${S.sleepTarget}h target, by ${hm(-diff)}.`);
+      else if (diff > 90) bits.push(`A long lie-in: ${hm(diff)} over your target.`);
+      else bits.push('You hit your sleep target.');
+      if (sc.hasStages) {
+        if (sc.deepPct >= 0.15) bits.push('Deep sleep was strong, which helps your body recover.');
+        else if (sc.deepPct < 0.10) bits.push('Deep sleep was low. Late meals, alcohol or a hard late session can do that.');
+        if (sc.remPct >= 0.20) bits.push('Plenty of REM too.');
+        else if (sc.remPct < 0.15) bits.push('REM was on the light side; it mostly comes late in the night, so a short night cuts it first.');
+      }
+      if (sc.score < 60) bits.push('Consider an easier training day.');
+      return bits.join(' ');
+    }
+
+    // ---------------- rendering ----------------
+    const CIRC = 2 * Math.PI * 52;
+    const setArc = (id, frac, color) => {
+      const el = $(id);
+      el.style.strokeDashoffset = String(CIRC * (1 - clamp01(frac)));
+      if (color) el.style.stroke = color;
+    };
+
+    function render() {
+      const h = new Date().getHours();
+      $('greet').textContent = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+      $('tabSleep').classList.toggle('on', view === 'sleep');
+      $('tabActivity').classList.toggle('on', view === 'activity');
+      $('viewSleep').hidden = view !== 'sleep';
+      $('viewActivity').hidden = view !== 'activity';
+
+      const isToday = selected === todayKey();
+      $('dayLabel').textContent = isToday ? 'Today' : selected === addDays(todayKey(), -1) ? 'Yesterday' : dayName(selected, { weekday: 'short', day: 'numeric', month: 'short' });
+      $('nextDay').disabled = isToday;
+      $('prevDay').disabled = dayKeys.length ? selected <= dayKeys[0] : true;
+
+      if (view === 'sleep') renderSleep(); else renderActivity();
+    }
+
+    function renderSleep() {
+      const sc = sleepScore(selected);
+      const d = days.get(selected);
+      const nightLabel = `Night of ${dayName(addDays(selected, -1), { weekday: 'short', day: 'numeric' })} → ${dayName(selected, { weekday: 'short', day: 'numeric', month: 'short' })}`;
+
+      $('sleepHeroBody').hidden = !sc;
+      $('stageSection').hidden = !sc || !sc.hasStages;
+      $('breakdownCard').hidden = !sc;
+      $('sleepEmpty').hidden = !!sc;
+      if (!sc) {
+        $('sleepEmpty').textContent = selected === todayKey()
+          ? 'No sleep synced yet this morning. Open your Shortcut or wait for the next sync, then refresh.'
+          : `No sleep recorded for the ${nightLabel.toLowerCase()}.`;
+      } else {
+        const [g, col] = gradeOf(sc.score);
+        $('scoreNum').textContent = sc.score;
+        setArc('scoreArc', sc.score / 100, col);
+        $('grade').textContent = g;
+        $('grade').style.background = 'color-mix(in srgb, ' + col + ' 18%, transparent)';
+        $('grade').style.color = col;
+        $('sleepTotal').innerHTML = '';
+        $('sleepTotal').append(hm(sc.mins));
+        const small = document.createElement('small'); small.textContent = 'asleep'; $('sleepTotal').append(small);
+        $('sleepNight').textContent = nightLabel;
+        $('sleepInsight').textContent = insightFor(sc);
+
+        if (sc.hasStages) {
+          const other = Math.max(0, sc.mins - sc.deep - sc.core - sc.rem);
+          const bar = $('stageBar'); bar.innerHTML = '';
+          [[sc.deep, 'var(--deep)'], [sc.core, 'var(--core)'], [sc.rem, 'var(--rem)'], [other, 'var(--faint)']].forEach(([v, c]) => {
+            if (v <= 0) return; const s = document.createElement('span'); s.style.width = (v / sc.mins * 100) + '%'; s.style.background = c; bar.append(s);
+          });
+          $('stDeep').textContent = hm(sc.deep); $('stDeepP').textContent = `${Math.round(sc.deep / sc.mins * 100)}% · ideal 13–23%`;
+          $('stCore').textContent = hm(sc.core); $('stCoreP').textContent = `${Math.round(sc.core / sc.mins * 100)}% · ideal 45–60%`;
+          $('stRem').textContent = hm(sc.rem); $('stRemP').textContent = `${Math.round(sc.rem / sc.mins * 100)}% · ideal 20–25%`;
+        }
+
+        const bd = $('breakdown'); bd.innerHTML = '';
+        for (const p of sc.parts) {
+          const row = document.createElement('div'); row.className = 'brow';
+          const top = document.createElement('div'); top.className = 'top-line';
+          const b = document.createElement('b'); b.textContent = p.name;
+          const sp = document.createElement('span'); sp.textContent = p.s == null ? 'not counted' : `${Math.round(p.s * p.max)} / ${p.max}`;
+          top.append(b, sp);
+          const bar = document.createElement('div'); bar.className = 'bar';
+          const fill = document.createElement('span');
+          fill.style.width = (p.s == null ? 0 : p.s * 100) + '%';
+          fill.style.background = p.s == null ? 'var(--faint)' : p.s >= 0.8 ? 'var(--good)' : p.s >= 0.5 ? 'var(--ok)' : 'var(--bad)';
+          bar.append(fill);
+          const why = document.createElement('div'); why.className = 'why'; why.textContent = p.why;
+          row.append(top, bar, why); bd.append(row);
+        }
+      }
+      drawSleepTrend();
+    }
+
+    function renderActivity() {
+      const d = days.get(selected);
+      const steps = d?.steps ?? null, kcal = d?.kcal ?? null;
+
+      $('stepsNum').textContent = steps == null ? '–' : steps >= 10000 ? (steps / 1000).toFixed(1) + 'k' : fmt(steps);
+      $('stepsPct').textContent = steps == null ? 'steps' : `${Math.round(steps / S.stepGoal * 100)}% of goal`;
+      setArc('stepsArc', (steps || 0) / S.stepGoal);
+      $('stepsToGo').textContent = steps == null ? `Goal ${fmt(S.stepGoal)}` : steps >= S.stepGoal ? `Goal smashed · ${fmt(steps)} steps` : `${fmt(S.stepGoal - steps)} to go`;
+
+      $('kcalNum').textContent = fmt(kcal);
+      $('kcalPct').textContent = kcal == null ? 'kcal' : `${Math.round(kcal / S.kcalGoal * 100)}% of goal`;
+      setArc('kcalArc', (kcal || 0) / S.kcalGoal);
+      $('kcalToGo').textContent = kcal == null ? `Goal ${fmt(S.kcalGoal)} kcal` : kcal >= S.kcalGoal ? 'Goal reached' : `${fmt(S.kcalGoal - kcal)} kcal to go`;
+
+      // Compare with the same point yesterday, so mid-day numbers aren't unfairly compared to a full day.
+      const y = days.get(addDays(selected, -1));
+      $('distVal').textContent = d?.dist != null ? d.dist.toFixed(2) : '–';
+      $('distD').textContent = y?.dist != null ? `Yesterday ${y.dist.toFixed(2)} km` : 'Walking + running';
+      $('vo2Val').textContent = d?.vo2 != null ? d.vo2.toFixed(1) : '–';
+      const vPrev = [...dayKeys].filter((k) => k < selected).map((k) => days.get(k).vo2).filter((v) => v != null).pop();
+      const vd = $('vo2D');
+      vd.className = 'd';
+      if (d?.vo2 != null && vPrev != null && Math.abs(d.vo2 - vPrev) >= 0.05) {
+        vd.textContent = `${d.vo2 > vPrev ? '▲' : '▼'} ${Math.abs(d.vo2 - vPrev).toFixed(2)} since last reading`;
+        vd.classList.add(d.vo2 > vPrev ? 'up' : 'down');
+      } else vd.textContent = 'mL/kg/min';
+
+      const sc = sleepScore(selected);
+      $('miniSleep').textContent = sc ? hm(sc.mins) : '–';
+      $('miniSleepD').textContent = sc ? `Sleep score ${sc.score}` : 'Not synced yet';
+      $('syncVal').textContent = d?.last ? d.last.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '–';
+      $('syncD').textContent = d ? `${d.rows.length} sync${d.rows.length === 1 ? '' : 's'} this day` : 'No syncs';
+
+      drawHourChart();
+      drawWeek('weekSteps', 'steps', 'var(--steps)', S.stepGoal);
+      drawWeek('weekKcal', 'kcal', 'var(--kcal)', S.kcalGoal);
+    }
+
+    // ---------------- charts ----------------
+    const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v.replace(/^var\(|\)$/g, '')).trim() || v;
+    Chart.defaults.font.family = 'Inter, system-ui, sans-serif';
+    Chart.defaults.color = css('var(--muted)');
+    const axes = (extra = {}) => ({
+      x: Object.assign({ grid: { display: false }, ticks: { color: css('var(--muted)'), maxRotation: 0, autoSkipPadding: 12 }, border: { display: false } }, extra.x || {}),
+      y: Object.assign({ grid: { color: css('var(--grid)') }, ticks: { color: css('var(--muted)'), maxTicksLimit: 5 }, border: { display: false }, beginAtZero: true }, extra.y || {}),
+    });
+    const tooltip = { backgroundColor: '#ffffff', borderColor: css('var(--line)'), borderWidth: 1, padding: 10, titleColor: css('var(--text)'), bodyColor: css('var(--muted)'), displayColors: true, boxPadding: 4 };
+    const replace = (id, cfg) => { if (charts[id]) charts[id].destroy(); charts[id] = new Chart($(id), cfg); };
+    const goalLine = (value) => ({
+      id: 'goal',
+      afterDatasetsDraw(chart) {
+        const y = chart.scales.y.getPixelForValue(value);
+        if (y < chart.chartArea.top) return;
+        const c = chart.ctx; c.save(); c.setLineDash([5, 5]); c.strokeStyle = css('var(--faint)'); c.lineWidth = 1;
+        c.beginPath(); c.moveTo(chart.chartArea.left, y); c.lineTo(chart.chartArea.right, y); c.stroke(); c.restore();
+      },
     });
 
-    // Custom date parser for strings formatted like "17 Oct 2026 at 20:54"
-    function parseCustomDate(dateStr) {
-      if (!dateStr) return null;
-      const cleanStr = dateStr.replace(' at ', ' ');
-      const parsedDate = new Date(cleanStr);
-      return isNaN(parsedDate.getTime()) ? null : parsedDate;
-    }
+    function drawHourChart() {
+      const d = days.get(selected);
+      const key = hourMetric === 'steps' ? 'steps' : 'kcal';
+      const color = css(hourMetric === 'steps' ? 'var(--steps)' : 'var(--kcal)');
+      const pts = (d?.rows || []).filter((r) => r[key] != null);
+      $('hourEmpty').hidden = pts.length > 0;
+      $('hourChart').parentElement.hidden = pts.length === 0;
+      $('hourTitle').textContent = hourMetric === 'steps' ? 'Steps through the day' : 'Active calories through the day';
+      if (!pts.length) return;
 
-    function loadDashboardData() {
-      let url = document.getElementById('sheetUrl').value.trim();
-      const statusEl = document.getElementById('lastUpdated');
-
-      if (!url) {
-        alert('Please enter a valid Google Sheet URL.');
-        return;
+      // Each sync carries a running total; the gain since the previous sync goes into that hour's bar.
+      const perHour = new Array(24).fill(0);
+      const total = new Array(24).fill(null);
+      let prev = 0;
+      for (const r of pts) {
+        const h = r.ts.getHours();
+        const gain = Math.max(0, r[key] - prev);
+        perHour[h] += gain;
+        prev = Math.max(prev, r[key]);
+        total[h] = prev;
       }
+      const lastHour = selected === todayKey() ? new Date().getHours() : 23;
+      let run = null;
+      for (let h = 0; h < 24; h++) { if (total[h] != null) run = total[h]; else if (run != null && h <= lastHour) total[h] = run; }
+      const labels = [...Array(24).keys()].map((h) => pad(h) + ':00');
 
-      // Automatically convert web output/pubhtml link to direct CSV output format
-      if (url.includes('/pubhtml')) {
-        url = url.replace('/pubhtml', '/pub?output=csv');
-        document.getElementById('sheetUrl').value = url;
-      } else if (!url.includes('output=csv') && url.includes('/pub')) {
-        url = url.includes('?') ? `${url}&output=csv` : `${url}?output=csv`;
-        document.getElementById('sheetUrl').value = url;
-      }
-
-      statusEl.textContent = 'Status: Fetching live spreadsheet data...';
-
-      Papa.parse(url, {
-        download: true,
-        header: false,
-        skipEmptyLines: true,
-        complete: function(results) {
-          processRawCsvData(results.data);
-          statusEl.textContent = `Status: Updated at ${new Date().toLocaleTimeString()}`;
-        },
-        error: function(err) {
-          console.error(err);
-          statusEl.textContent = 'Status: Error fetching CSV.';
-          alert('Failed to parse Google Sheet CSV. Make sure the document is published to the web.');
-        }
-      });
-    }
-
-    function processRawCsvData(rows) {
-      groupedByDate = {};
-      rawParsedData = [];
-
-      // Locate row index containing column headers (scanning for 'date')
-      let headerRowIndex = -1;
-      for (let i = 0; i < Math.min(10, rows.length); i++) {
-        if (rows[i][0] && rows[i][0].toString().toLowerCase().trim() === 'date') {
-          headerRowIndex = i;
-          break;
-        }
-      }
-
-      const dataRows = headerRowIndex !== -1 ? rows.slice(headerRowIndex + 1) : rows;
-
-      dataRows.forEach(row => {
-        const rawDateStr = row[0];
-        const dateObj = parseCustomDate(rawDateStr);
-
-        if (dateObj) {
-          const dateKey = dateObj.toISOString().split('T')[0]; // YYYY-MM-DD
-          const timeLabel = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-          const entry = {
-            timestamp: dateObj,
-            timeLabel: timeLabel,
-            steps: parseFloat(row[1]) || 0,
-            distance: parseFloat(row[2]) || 0,
-            vo2max: parseFloat(row[3]) || 0,
-            calories: parseFloat(row[4]) || 0
-          };
-
-          rawParsedData.push(entry);
-
-          if (!groupedByDate[dateKey]) {
-            groupedByDate[dateKey] = [];
-          }
-          groupedByDate[dateKey].push(entry);
-        }
-      });
-
-      populateDateSelector();
-      updateDashboardView();
-    }
-
-    function populateDateSelector() {
-      const dateSelect = document.getElementById('dateSelect');
-      dateSelect.innerHTML = '';
-
-      const availableDates = Object.keys(groupedByDate).sort().reverse();
-
-      if (availableDates.length === 0) {
-        const opt = document.createElement('option');
-        opt.textContent = 'No valid records found';
-        dateSelect.appendChild(opt);
-        return;
-      }
-
-      availableDates.forEach((dateStr, idx) => {
-        const opt = document.createElement('option');
-        opt.value = dateStr;
-        const formattedDate = new Date(dateStr + 'T00:00:00').toLocaleDateString(undefined, { 
-          weekday: 'short', 
-          year: 'numeric', 
-          month: 'short', 
-          day: 'numeric' 
-        });
-        opt.textContent = idx === 0 ? `${formattedDate} (Latest)` : formattedDate;
-        dateSelect.appendChild(opt);
-      });
-    }
-
-    function updateDashboardView() {
-      const selectedDateKey = document.getElementById('dateSelect').value;
-      const dayEntries = groupedByDate[selectedDateKey] || [];
-
-      if (dayEntries.length === 0) return;
-
-      // Chronological sort for linear chart rendering
-      dayEntries.sort((a, b) => a.timestamp - b.timestamp);
-
-      // Latest hourly snapshot of selected date
-      const latestRecord = dayEntries[dayEntries.length - 1];
-
-      document.getElementById('metricSteps').textContent = latestRecord.steps.toLocaleString();
-      document.getElementById('metricDistance').textContent = `${latestRecord.distance.toFixed(2)} km`;
-      document.getElementById('metricCalories').textContent = `${latestRecord.calories.toFixed(1)} kcal`;
-      document.getElementById('metricVo2').textContent = latestRecord.vo2max > 0 ? latestRecord.vo2max.toFixed(2) : '--';
-
-      renderCharts(dayEntries);
-    }
-
-    function renderCharts(entries) {
-      const labels = entries.map(e => e.timeLabel);
-      const stepsData = entries.map(e => e.steps);
-      const caloriesData = entries.map(e => e.calories);
-
-      // Render Steps Progression Chart
-      const ctxSteps = document.getElementById('stepsChart').getContext('2d');
-      if (stepsChartInstance) stepsChartInstance.destroy();
-
-      stepsChartInstance = new Chart(ctxSteps, {
-        type: 'line',
+      replace('hourChart', {
         data: {
-          labels: labels,
-          datasets: [{
-            label: 'Steps',
-            data: stepsData,
-            borderColor: '#60a5fa',
-            backgroundColor: 'rgba(96, 165, 250, 0.15)',
-            fill: true,
-            tension: 0.3
-          }]
+          labels,
+          datasets: [
+            { type: 'bar', label: 'This hour', data: perHour.map((v, h) => (h <= lastHour ? Math.round(v) : null)), backgroundColor: color + '40', hoverBackgroundColor: color + '99', borderRadius: 4, yAxisID: 'y', order: 2 },
+            { type: 'line', label: 'Running total', data: total.map((v) => (v == null ? null : Math.round(v))), borderColor: color, backgroundColor: color, borderWidth: 2.5, pointRadius: 0, pointHoverRadius: 4, tension: 0, spanGaps: false, yAxisID: 'y1', order: 1 },
+          ],
         },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
-            y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
-          }
-        }
+          responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false }, tooltip: Object.assign({}, tooltip, { callbacks: { label: (c) => ` ${c.dataset.label}: ${fmt(c.parsed.y)}${key === 'kcal' ? ' kcal' : ''}` } }) },
+          scales: Object.assign(axes({ x: { ticks: { color: css('var(--muted)'), maxRotation: 0, callback: (v, i) => (i % 3 === 0 ? labels[i] : '') } } }), {
+            y1: { position: 'right', beginAtZero: true, grid: { display: false }, border: { display: false }, ticks: { color: color, maxTicksLimit: 5 } },
+          }),
+        },
       });
+    }
 
-      // Render Active Calories Bar Chart
-      const ctxCalories = document.getElementById('caloriesChart').getContext('2d');
-      if (caloriesChartInstance) caloriesChartInstance.destroy();
-
-      caloriesChartInstance = new Chart(ctxCalories, {
+    function drawWeek(id, key, colorVar, goal) {
+      const keys = [...Array(7).keys()].map((i) => addDays(selected, i - 6));
+      const vals = keys.map((k) => days.get(k)?.[key] ?? null);
+      const color = css(colorVar);
+      replace(id, {
         type: 'bar',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Active Cals',
-            data: caloriesData,
-            backgroundColor: '#f59e0b',
-            borderRadius: 4
-          }]
-        },
+        data: { labels: keys.map((k) => dayName(k, { weekday: 'short' })), datasets: [{ data: vals.map((v) => (v == null ? null : Math.round(v))), backgroundColor: vals.map((v, i) => (i === 6 ? color : color + (v != null && v >= goal ? 'cc' : '66'))), borderRadius: 8, maxBarThickness: 34 }] },
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
-            y: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } }
-          }
-        }
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: Object.assign({}, tooltip, { displayColors: false, callbacks: { title: (c) => dayName(keys[c[0].dataIndex], { weekday: 'long', day: 'numeric', month: 'short' }), label: (c) => `${fmt(c.parsed.y)}${key === 'kcal' ? ' kcal' : ' steps'}` } }) },
+          scales: axes({ y: { suggestedMax: goal * 1.1 } }),
+        },
+        plugins: [goalLine(goal)],
       });
     }
+
+    function drawSleepTrend() {
+      const keys = [...Array(14).keys()].map((i) => addDays(selected, i - 13));
+      const ds = keys.map((k) => days.get(k));
+      const h = (m) => (m == null ? null : Math.round(m / 6) / 10);
+      const deep = ds.map((d) => (d?.sleep ? h(d.deep || 0) : null));
+      const core = ds.map((d) => (d?.sleep ? h(d.core || 0) : null));
+      const rem = ds.map((d) => (d?.sleep ? h(d.rem || 0) : null));
+      const other = ds.map((d) => (d?.sleep ? h(Math.max(0, d.sleep - (d.deep || 0) - (d.core || 0) - (d.rem || 0))) : null));
+      const scores = keys.map((k) => sleepScore(k)?.score ?? null);
+      const bar = (label, data, c) => ({ type: 'bar', label, data, backgroundColor: css(c), stack: 's', borderRadius: 3, maxBarThickness: 26, yAxisID: 'y', order: 2 });
+      replace('sleepTrend', {
+        data: {
+          labels: keys.map((k) => dayName(k, { day: 'numeric' })),
+          datasets: [
+            bar('Deep', deep, 'var(--deep)'), bar('Core', core, 'var(--core)'), bar('REM', rem, 'var(--rem)'), bar('No stage', other, 'var(--faint)'),
+            { type: 'line', label: 'Score', data: scores, yAxisID: 'y1', borderColor: css('var(--text)'), backgroundColor: css('var(--text)'), borderWidth: 2, pointRadius: 3, tension: 0, spanGaps: true, order: 1 },
+          ],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: Object.assign({}, tooltip, {
+              filter: (c) => c.parsed.y != null && c.parsed.y > 0,
+              callbacks: {
+                title: (c) => 'Night ending ' + dayName(keys[c[0].dataIndex], { weekday: 'short', day: 'numeric', month: 'short' }),
+                label: (c) => c.dataset.label === 'Score' ? ` Score: ${c.parsed.y}` : ` ${c.dataset.label}: ${hm(c.parsed.y * 60)}`,
+              },
+            }),
+          },
+          scales: Object.assign(axes({ x: { stacked: true }, y: { stacked: true, suggestedMax: 9, ticks: { color: css('var(--muted)'), maxTicksLimit: 5, callback: (v) => v + 'h' } } }), {
+            y1: { position: 'right', min: 0, max: 100, grid: { display: false }, border: { display: false }, ticks: { color: css('var(--text)'), maxTicksLimit: 3 } },
+          }),
+        },
+      });
+    }
+
+    // ---------------- events ----------------
+    for (const b of document.querySelectorAll('.seg button')) b.addEventListener('click', () => { view = b.dataset.view; render(); });
+    for (const b of document.querySelectorAll('.tabs-mini button')) b.addEventListener('click', () => {
+      hourMetric = b.dataset.metric;
+      document.querySelectorAll('.tabs-mini button').forEach((x) => x.classList.toggle('on', x === b));
+      drawHourChart();
+    });
+    $('prevDay').addEventListener('click', () => { selected = addDays(selected, -1); render(); });
+    $('nextDay').addEventListener('click', () => { if (selected < todayKey()) { selected = addDays(selected, 1); render(); } });
+    $('refreshBtn').addEventListener('click', load);
+
+    const dlg = $('settings');
+    $('settingsBtn').addEventListener('click', () => {
+      $('setUrl').value = S.url; $('setSteps').value = S.stepGoal; $('setKcal').value = S.kcalGoal; $('setSleep').value = S.sleepTarget;
+      dlg.showModal();
+    });
+    dlg.addEventListener('close', () => {
+      if (dlg.returnValue !== 'save') return;
+      const urlChanged = $('setUrl').value.trim() && $('setUrl').value.trim() !== S.url;
+      S.url = $('setUrl').value.trim() || DEFAULTS.url;
+      S.stepGoal = Math.max(1000, num($('setSteps').value) || DEFAULTS.stepGoal);
+      S.kcalGoal = Math.max(100, num($('setKcal').value) || DEFAULTS.kcalGoal);
+      S.sleepTarget = Math.min(11, Math.max(5, num($('setSleep').value) || DEFAULTS.sleepTarget));
+      saveSettings();
+      if (urlChanged) load(); else render();
+    });
+
+    // Refresh when you come back to the page, and every 5 minutes while it's open.
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { if (selected < todayKey() && !days.has(addDays(selected, 1))) selected = todayKey(); load(); } });
+    setInterval(() => { if (document.visibilityState === 'visible') load(); }, 5 * 60 * 1000);
+
+    render();
+    load();
+  })();
   </script>
 </body>
 </html>
